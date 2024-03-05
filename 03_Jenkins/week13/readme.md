@@ -1,2 +1,105 @@
 # Week 13
 - Test webhook Jenkin:00
+
+pipeline {
+    agent any
+
+    environment {
+        // Define variables
+        DOCKER_IMAGE       = 'darklmoon/fastapi-webhook:latest'
+        DOCKER_CREDENTIALS = credentials('dockerhub')
+        REMOTE_HOST     = 'darklmoon@34.143.187.146' // Replace with your actual username and remote IP.
+        SSH_CREDENTIALS = 'ssh_prod_instance' // Use the ID of the Jenkins stored SSH credentials.
+    }
+
+    stages {
+        stage('Start Jenkins') {
+            steps {
+                // Checkout your source code from version control
+             
+                    sh 'echo Start Jenkins............'
+                    sh 'echo docker : user = $DOCKER_CREDENTIALS_USR : password = $DOCKER_CREDENTIALS_PSW'
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                    // Build the Docker image
+                    
+                    dir('./03_Jenkins/week13/03_Github_webhook') {
+                       sh 'echo "Running in $(pwd)"'
+                       sh 'echo start build the Docker image = $DOCKER_IMAGE'
+                       sh 'docker build -t $DOCKER_IMAGE .'
+                    }   
+                  
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    
+                    // Login to Docker Hub
+                    sh 'echo $DOCKER_CREDENTIALS_PSW | docker login --username $DOCKER_CREDENTIALS_USR --password-stdin'
+                    // Push the image
+                    sh 'docker push $DOCKER_IMAGE'
+                }
+            }
+        }
+
+        stage('Clear Docker Components') {
+            steps {
+                script {
+                    // Remove Docker images and containers
+                    sh 'docker stop $(docker ps -a -q)'  
+                    sh  'docker rm $(docker ps -a -q)' 
+                    sh  'docker rmi $(docker images -q)'
+                    sh 'docker system prune -af'
+                }
+            }
+        }
+
+
+        stage('Deploy') {
+            steps {
+                script {
+                    // Pull the Docker image from Docker Hub
+                    sh 'docker pull $DOCKER_IMAGE'
+                    // Run the Docker container
+                    sh 'docker run -d --name fastapi-webhook -p 8085:80 $DOCKER_IMAGE'
+                }
+            }
+        }
+
+        stage('Login to Docker Hub') {
+            steps {
+                // This step logs into Docker Hub using credentials stored in Jenkins.
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKERHUB_USER')]) {
+                    sh 'echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USER --password-stdin'
+                }
+            }
+        }
+
+        stage('Run Docker on Remote Server') {
+            steps {
+                // Uses the SSH Agent plugin to setup SSH credentials.
+                sshagent([SSH_CREDENTIALS]) {
+                    // These commands manage Docker containers on the remote server.
+                    // It stops and removes all containers, then removes all images, before running a new container.
+                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker stop \$(docker ps -a -q) || true'"
+                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker rm \$(docker ps -a -q) || true'"
+                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker rmi \$(docker images -q) || true'"
+                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker run -d --name fastapi-webhook -p 8085:80 $DOCKER_IMAGE'"
+                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker ps -a'"
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Logout from Docker Hub
+            sh 'docker logout'
+        }
+    }
+}
