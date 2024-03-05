@@ -5,6 +5,8 @@ pipeline {
         // Define variables
         DOCKER_IMAGE       = 'darklmoon/fastapi-webhook:latest'
         DOCKER_CREDENTIALS = credentials('dockerhub')
+        REMOTE_HOST     = 'darklmoon@34.143.187.146' // Replace with your actual username and remote IP.
+        SSH_CREDENTIALS = 'ssh-prod_instance' // Use the ID of the Jenkins stored SSH credentials.
     }
 
     stages {
