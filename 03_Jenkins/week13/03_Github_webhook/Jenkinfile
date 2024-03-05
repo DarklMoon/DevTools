@@ -35,14 +35,13 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    
-                    // Login to Docker Hub
-                    sh 'echo $DOCKER_CREDENTIALS_PSW | docker login --username $DOCKER_CREDENTIALS_USR --password-stdin'
-                    // Push the image
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKERHUB_USER')]) {
+                    sh 'echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USER --password-stdin'
                     sh 'docker push $DOCKER_IMAGE'
+                    }
                 }
             }
-        }
+    }
 
         stage('Clear Docker Components') {
             steps {
