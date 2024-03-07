@@ -6,7 +6,7 @@ pipeline {
         DOCKER_IMAGE    = 'darklmoon/fastapi-webhook:latest' // Ensure this Docker image name is correct and accessible.
         DOCKER_CREDENTIALS = credentials('dockerhub')
         REMOTE_HOST     = 'darklmoon@34.143.187.146' // Replace with your actual username and remote IP.
-        SSH_CREDENTIALS = 'ssh-prod_instance' // Use the ID of the Jenkins stored SSH credentials >>> Hello SSH-00-01.
+        SSH_CREDENTIALS = 'ssh-prod_instance' // Use the ID of the Jenkins stored SSH credentials >>> Hello SSH-00-01-02.
     }
 
         stages {
