@@ -9,7 +9,7 @@ pipeline {
         SSH_CREDENTIALS = 'ssh-prod_instance' // Use the ID of the Jenkins stored SSH credentials >>> Hello SSH-00-01-02-03-04.
     }
 
-        stages {
+    stages {
         stage('Start Jenkins') {
             steps {
                 // Checkout your source code from version control
@@ -35,67 +35,24 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKERHUB_USER')]) {
-                    sh 'echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USER --password-stdin'
+                    
+                    // Login to Docker Hub
+                    sh 'echo $DOCKER_CREDENTIALS_PSW | docker login --username $DOCKER_CREDENTIALS_USR --password-stdin'
+                    // Push the image
                     sh 'docker push $DOCKER_IMAGE'
-                    }
-                }
-            }
-    }
-
-        stage('Clear Docker Components') {
-            steps {
-                script {
-                    // Only stop containers if there are any running
-                    sh 'docker ps -q | xargs -r docker stop'
-                    // Only remove containers if there are any
-                    sh 'docker ps -a -q | xargs -r docker rm'
-                    // Only remove images if there are any
-                    sh 'docker images -q | xargs -r docker rmi'
-                    // Clean up unused Docker objects
-                    sh 'docker system prune -af'
                 }
             }
         }
 
 
 
-        stage('Deploy') {
-            steps {
-                script {
-                    // Pull the Docker image from Docker Hub
-                    sh 'docker pull $DOCKER_IMAGE'
-                    // Run the Docker container
-                    sh 'docker run -d --name fastapi-webhook -p 8085:80 $DOCKER_IMAGE'
+        stage('Trigger to slave job'){
+                steps {
+                    build job: 'webhook-ssh'
                 }
-            }
-        }
-            
-
-        stage('Login to Docker Hub') {
-            steps {
-                // This step logs into Docker Hub using credentials stored in Jenkins.
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'DOCKERHUB_PASSWORD', usernameVariable: 'DOCKERHUB_USER')]) {
-                    sh 'echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USER --password-stdin'
-                }
-            }
-        }
-
-        stage('Run Docker on Remote Server') {
-            steps {
-                // Uses the SSH Agent plugin to setup SSH credentials.
-                sshagent([SSH_CREDENTIALS]) {
-                    // These commands manage Docker containers on the remote server.
-                    // It stops and removes all containers, then removes all images, before running a new container.
-                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker stop \$(docker ps -a -q) || true'"
-                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker rm \$(docker ps -a -q) || true'"
-                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker rmi \$(docker images -q) || true'"
-                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker run -d --name fastapi-webhook -p 8085:80 $DOCKER_IMAGE'"
-                    sh "ssh -o StrictHostKeyChecking=no $REMOTE_HOST 'docker ps -a'"
-                }
-            }
         }
     }
+
     post {
         always {
             // Logout from Docker Hub
